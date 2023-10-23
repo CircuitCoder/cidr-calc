@@ -113,9 +113,6 @@ impl<const MAX_DEPTH: usize> SetNode<MAX_DEPTH> {
         assert_ne!(self.depth, MAX_DEPTH);
         let left = substract_option(left_ref, &ano.left);
         let right = substract_option(right_ref, &ano.right);
-        println!("Depth: {}", self.depth);
-        println!("Left: {:?}", left);
-        println!("Right: {:?}", right);
         let covered = left.as_ref().map_or(false, |i| i.covered)
             && right.as_ref().map_or(false, |i| i.covered);
 

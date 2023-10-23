@@ -43,4 +43,6 @@ add_sub = { atomic ~ ((add_op | sub_op) ~ atomic)* }
 expr = {
     let_in | add_sub
 }
+
+// TODO: support multiple exprs
 main = { SOI ~ expr ~ EOI }

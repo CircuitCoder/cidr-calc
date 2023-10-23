@@ -1,8 +1,8 @@
-use std::{rc::Rc, collections::{HashMap, VecDeque}, borrow::BorrowMut, char::MAX};
+use std::{rc::Rc, collections::VecDeque};
 
 use anyhow::anyhow;
 
-use crate::{parser::{Expr, Atomic, parse}, data::{V4, V6}};
+use crate::{parser::{Expr, Atomic}, data::{V4, V6}};
 
 #[derive(Clone, Debug)]
 struct SetNode<const MAX_DEPTH: usize> {
@@ -140,6 +140,14 @@ struct SetWalker<'a, const MAX_DEPTH: usize> {
 }
 
 impl<'a, const MAX_DEPTH: usize> SetWalker<'a, MAX_DEPTH> {
+    pub fn new(n: &'a SetNode<MAX_DEPTH>) -> Self {
+        let mut s = Self {
+            stack: VecDeque::with_capacity(MAX_DEPTH + 1),
+        };
+        s.stack.push_back(SetWalkerFrame { node: n, inspected_branches: 0 });
+        s
+    }
+
     fn step(&mut self) {
         if self.stack.is_empty() {
             assert!(self.stack.is_empty());
@@ -174,8 +182,8 @@ impl<'a, const MAX_DEPTH: usize> Iterator for SetWalker<'a, MAX_DEPTH> {
 
     fn next(&mut self) -> Option<Self::Item> {
         while match self.stack.back() {
-            None => true,
-            Some(inner) => !inner.node.covered
+            None => false,
+            Some(inner) => !inner.node.covered || inner.inspected_branches > 0
         } {
             self.step();
         }
@@ -200,6 +208,10 @@ impl<'a, const MAX_DEPTH: usize> Iterator for SetWalker<'a, MAX_DEPTH> {
             len += 1;
         }
 
+        if len != 0 { // Avoid UB
+            addr <<= MAX_DEPTH - len;
+        }
+
         self.step();
 
         return Some((addr, len));
@@ -207,7 +219,7 @@ impl<'a, const MAX_DEPTH: usize> Iterator for SetWalker<'a, MAX_DEPTH> {
 }
 
 #[derive(Clone, Debug)]
-enum Value {
+pub enum Value {
     V4Set(SetNode<32>),
     V6Set(SetNode<128>),
 }
@@ -280,9 +292,21 @@ impl From<&V4> for SetNode<32> {
     }
 }
 
+impl From<(u128, usize)> for V4 {
+    fn from(value: (u128, usize)) -> Self {
+        Self(value.0 as u32, value.1 as u8)
+    }
+}
+
 impl From<&V6> for SetNode<128> {
     fn from(value: &V6) -> Self {
         construct_set_node(value.0, value.1 as usize, 0)
+    }
+}
+
+impl From<(u128, usize)> for V6 {
+    fn from(value: (u128, usize)) -> Self {
+        Self(value.0, value.1 as u8)
     }
 }
 
@@ -295,6 +319,13 @@ pub fn eval<'a>(expr: &Expr<'a>) -> anyhow::Result<Value> {
     eval_scope(expr, Scope {
         bindings: Default::default()
     })
+}
+
+pub fn format<'a>(v: &'a Value) -> Box<dyn Iterator<Item = String> + 'a> {
+    match v {
+        Value::V4Set(s) => Box::new(SetWalker::new(s).map(V4::from).map(|e| e.to_string())),
+        Value::V6Set(s) => Box::new(SetWalker::new(s).map(V6::from).map(|e| e.to_string())),
+    }
 }
 
 fn eval_scope<'a>(expr: &Expr<'a>, s: Scope<'a>) -> anyhow::Result<Value> {
@@ -328,7 +359,11 @@ fn eval_scope<'a>(expr: &Expr<'a>, s: Scope<'a>) -> anyhow::Result<Value> {
 
 #[test]
 fn test() {
+    use crate::parser::parse;
+    // FIXME: write real test!
     println!("{:?}", eval(&parse("0.0.0.0/0").unwrap()));
     println!("{:?}", eval(&parse("::1/128").unwrap()));
     println!("{:?}", eval(&parse("::1/128 - ::/0").unwrap()));
+    println!("{:?}", eval(&parse("0.0.0.0/1").unwrap()));
+    println!("{:?}", eval(&parse("0.0.0.0/1 + 128.0.0.0/1").unwrap()));
 }

@@ -96,9 +96,26 @@ impl<const MAX_DEPTH: usize> SetNode<MAX_DEPTH> {
             return self.clone();
         }
 
+        let mut left_ref = &self.left;
+        let mut right_ref = &self.right;
+        let full;
+        if self.covered {
+            full = Some(Rc::new(SetNode {
+                depth: self.depth + 1,
+                covered: true,
+                left: None,
+                right: None,
+            }));
+            left_ref = &full;
+            right_ref = &full;
+        }
+
         assert_ne!(self.depth, MAX_DEPTH);
-        let left = substract_option(&self.left, &ano.left);
-        let right = substract_option(&self.right, &ano.right);
+        let left = substract_option(left_ref, &ano.left);
+        let right = substract_option(right_ref, &ano.right);
+        println!("Depth: {}", self.depth);
+        println!("Left: {:?}", left);
+        println!("Right: {:?}", right);
         let covered = left.as_ref().map_or(false, |i| i.covered)
             && right.as_ref().map_or(false, |i| i.covered);
 
@@ -366,4 +383,5 @@ fn test() {
     println!("{:?}", eval(&parse("::1/128 - ::/0").unwrap()));
     println!("{:?}", eval(&parse("0.0.0.0/1").unwrap()));
     println!("{:?}", eval(&parse("0.0.0.0/1 + 128.0.0.0/1").unwrap()));
+    println!("{:?}", eval(&parse("0.0.0.0/0 - 101.6.6.6/32").unwrap()));
 }

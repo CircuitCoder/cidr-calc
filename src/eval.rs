@@ -23,7 +23,7 @@ fn union_option<const MAX_DEPTH: usize>(
     }
 }
 
-fn substract_option<const MAX_DEPTH: usize>(
+fn subtract_option<const MAX_DEPTH: usize>(
     lhs: &Option<Rc<SetNode<MAX_DEPTH>>>,
     rhs: &Option<Rc<SetNode<MAX_DEPTH>>>,
 ) -> Option<Rc<SetNode<MAX_DEPTH>>> {
@@ -31,8 +31,8 @@ fn substract_option<const MAX_DEPTH: usize>(
         (None, _) => None,
         (l @ Some(_), None) => l.clone(),
         (Some(l), Some(r)) => {
-            let raw = l.substract(r.as_ref());
-            // Substraction may result in empty set
+            let raw = l.subtract(r.as_ref());
+            // Subtraction may result in empty set
             if !raw.covered && raw.left.is_none() && raw.right.is_none() {
                 None
             } else {
@@ -81,7 +81,7 @@ impl<const MAX_DEPTH: usize> SetNode<MAX_DEPTH> {
         }
     }
 
-    pub fn substract(&self, ano: &SetNode<MAX_DEPTH>) -> SetNode<MAX_DEPTH> {
+    pub fn subtract(&self, ano: &SetNode<MAX_DEPTH>) -> SetNode<MAX_DEPTH> {
         assert_eq!(ano.depth, self.depth);
         if self.is_empty() || ano.covered {
             return SetNode {
@@ -111,8 +111,8 @@ impl<const MAX_DEPTH: usize> SetNode<MAX_DEPTH> {
         }
 
         assert_ne!(self.depth, MAX_DEPTH);
-        let left = substract_option(left_ref, &ano.left);
-        let right = substract_option(right_ref, &ano.right);
+        let left = subtract_option(left_ref, &ano.left);
+        let right = subtract_option(right_ref, &ano.right);
         let covered = left.as_ref().map_or(false, |i| i.covered)
             && right.as_ref().map_or(false, |i| i.covered);
 
@@ -258,14 +258,14 @@ impl Value {
         }
     }
 
-    fn substract(&self, ano: &Value) -> anyhow::Result<Value> {
+    fn subtract(&self, ano: &Value) -> anyhow::Result<Value> {
         if !self.is_same_len(&ano) {
-            return Err(anyhow!("Cannot substract a v4 set to a v6 set")); // TODO: diagnostic
+            return Err(anyhow!("Cannot subtract a v4 set to a v6 set")); // TODO: diagnostic
         }
 
         match (self, ano) {
-            (Value::V4Set(l), Value::V4Set(r)) => Ok(Value::V4Set(l.substract(r))),
-            (Value::V6Set(l), Value::V6Set(r)) => Ok(Value::V6Set(l.substract(r))),
+            (Value::V4Set(l), Value::V4Set(r)) => Ok(Value::V4Set(l.subtract(r))),
+            (Value::V6Set(l), Value::V6Set(r)) => Ok(Value::V6Set(l.subtract(r))),
             _ => unreachable!(),
         }
     }
@@ -358,7 +358,7 @@ fn eval_scope<'a>(expr: &Expr<'a>, s: Scope<'a>) -> anyhow::Result<Value> {
         Expr::Subtraction(lhs, rhs) => {
             let lhs = eval_scope(lhs, s.clone())?;
             let rhs = eval_scope(rhs, s)?;
-            lhs.substract(&rhs)
+            lhs.subtract(&rhs)
         }
         Expr::Atomic(a) => match a {
             Atomic::Ident(i) => {

@@ -8,5 +8,6 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.75"
 clap = { version = "4.4.6", features = ["derive"] }
+im = "15.1.0"
 pest = "2.7.4"
 pest_derive = "2.7.4"

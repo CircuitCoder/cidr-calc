@@ -1,0 +1,46 @@
+WHITESPACE = _{ " " | "\n" | "\r" }
+
+number = @{
+    ASCII_DIGIT+
+}
+hex = @{
+    ASCII_HEX_DIGIT{1,4}
+}
+kw = @{
+    "let" | "in"
+}
+ident_head = @{
+    ASCII_ALPHA | "_"
+}
+ident_tail = @{
+    ASCII_ALPHANUMERIC | "_"
+}
+ident = @{
+    !(hex ~ ":")
+    ~ !(kw ~ !ident_tail)
+    ~ ident_head ~ ident_tail+
+}
+
+v4addr = @{ number ~ "." ~ number ~ "." ~ number ~ "." ~ number }
+v4cidr = @{ v4addr ~ "/" ~ number } // No spaces allowed here
+
+v6seg = @{ hex ~ (":" ~ hex)* }
+v6addr = @{ v6seg? ~ ("::" ~ v6seg?)? }
+v6cidr = @{ v6addr ~ "/" ~ number }
+
+paren_expr = { "(" ~ expr ~ ")" }
+atomic = {
+    paren_expr
+    | ident
+    | v4cidr
+    | v6cidr
+}
+
+let_in = { "let" ~ ident ~ "=" ~ expr ~ "in" ~ expr }
+add_op = { "+" }
+sub_op = { "-" }
+add_sub = { atomic ~ ((add_op | sub_op) ~ atomic)* }
+expr = {
+    let_in | add_sub
+}
+main = { SOI ~ expr ~ EOI }

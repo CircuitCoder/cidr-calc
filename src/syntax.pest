@@ -36,13 +36,13 @@ atomic = {
     | v6cidr
 }
 
-let_in = { "let" ~ ident ~ "=" ~ expr ~ "in" ~ expr }
+let_in = { "let" ~ ident ~ "=" ~ expr }
 add_op = { "+" }
 sub_op = { "-" }
-add_sub = { atomic ~ ((add_op | sub_op) ~ atomic)* }
-expr = {
-    let_in | add_sub
+expr = { atomic ~ ((add_op | sub_op) ~ atomic)* }
+stmt = {
+    let_in | expr
 }
 
-// TODO: support multiple exprs
-main = { SOI ~ expr ~ EOI }
+multiple_stmt = { SOI ~ stmt+ ~ EOI }
+single_stmt = { SOI ~ stmt ~ EOI }

@@ -5,16 +5,26 @@ use anyhow::anyhow;
 use crate::data::*;
 
 #[derive(Parser)]
-#[grammar="../syntax.pest"]
+#[grammar="./syntax.pest"]
 struct SrcParser;
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum Expr<'a> {
+pub enum Stmt<'a> {
     LetIn {
         ident: &'a str,
         val: Box<Expr<'a>>,
-        body: Box<Expr<'a>>
     },
+    Expr(Expr<'a>)
+}
+
+impl<'a> From<Expr<'a>> for Stmt<'a> {
+    fn from(value: Expr<'a>) -> Self {
+        Self::Expr(value)
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum Expr<'a> {
     Addition(Box<Expr<'a>>, Box<Expr<'a>>),
     Subtraction(Box<Expr<'a>>, Box<Expr<'a>>),
     Atomic(Atomic<'a>),
@@ -42,7 +52,7 @@ fn process_v6_half(half: &str) -> (u128, u8) {
     (result, cnt)
 }
 
-fn map_output<'a>(p: Pair<'a, Rule>) -> anyhow::Result<Expr<'a>> {
+fn map_expr<'a>(p: Pair<'a, Rule>) -> anyhow::Result<Expr<'a>> {
     // println!("Processing: {:?}", p.as_rule());
     // TODO: a million assertions
     match p.as_rule() {
@@ -110,18 +120,11 @@ fn map_output<'a>(p: Pair<'a, Rule>) -> anyhow::Result<Expr<'a>> {
 
             Ok(Expr::Atomic(Atomic::V6(V6(addr, len_parsed as u8))))
         }
-        Rule::let_in => {
+        Rule::expr => {
             let mut p = p.into_inner();
-            let ident = p.next().unwrap().as_str();
-            let val = Box::new(map_output(p.next().unwrap())?);
-            let body = Box::new(map_output(p.next().unwrap())?);
-            Ok(Expr::LetIn { ident, val, body })
-        }
-        Rule::add_sub => {
-            let mut p = p.into_inner();
-            let mut collected = map_output(p.next().unwrap())?;
+            let mut collected = map_expr(p.next().unwrap())?;
             while let Some(op) = p.next() {
-                let rhs = map_output(p.next().unwrap())?;
+                let rhs = map_expr(p.next().unwrap())?;
                 if op.as_rule() == Rule::add_op {
                     collected = Expr::Addition(Box::new(collected), Box::new(rhs));
                 } else {
@@ -130,42 +133,64 @@ fn map_output<'a>(p: Pair<'a, Rule>) -> anyhow::Result<Expr<'a>> {
             }
             Ok(collected)
         }
-        Rule::main | Rule::atomic | Rule::expr => map_output(p.into_inner().next().unwrap()),
-        Rule::paren_expr => map_output(p.into_inner().skip(1).next().unwrap()),
+        Rule::atomic | Rule::expr => map_expr(p.into_inner().next().unwrap()),
+        Rule::paren_expr => map_expr(p.into_inner().skip(1).next().unwrap()),
         e => unreachable!("Excuse me pest? Why am I reading {:?}?", e)
     }
 }
 
-pub fn parse<'a>(input: &'a str) -> anyhow::Result<Expr<'a>> {
-    let raw = SrcParser::parse(Rule::main, input)?.next().unwrap();
-    map_output(raw)
+fn map_stmt<'a>(p: Pair<'a, Rule>) -> anyhow::Result<Stmt<'a>> {
+    assert_eq!(p.as_rule(), Rule::stmt);
+    let p = p.into_inner().next().unwrap();
+    match p.as_rule() {
+        Rule::let_in => {
+            let mut p = p.into_inner();
+            let ident = p.next().unwrap().as_str();
+            let val = Box::new(map_expr(p.next().unwrap())?);
+            Ok(Stmt::LetIn { ident, val })
+        },
+        Rule::expr => {
+            map_expr(p).map(Into::into)
+        },
+        e => unreachable!("Excuse me pest? Why am I reading {:?}?", e)
+    }
+}
+
+pub fn parse_single<'a>(input: &'a str) -> anyhow::Result<Stmt<'a>> {
+    let raw = SrcParser::parse(Rule::single_stmt, input)?.next().unwrap().into_inner().next().unwrap();
+    map_stmt(raw)
+}
+
+pub fn parse<'a>(input: &'a str) -> anyhow::Result<Vec<Stmt<'a>>> {
+    let raw = SrcParser::parse(Rule::multiple_stmt, input)?.next().unwrap();
+    raw.into_inner().filter(|e| e.as_rule() != Rule::EOI).map(|p| map_stmt(p)).collect()
 }
 
 #[test]
 fn test_parser() {
-    let parsed = parse("0.0.0.0/0");
+    let parsed = parse_single("0.0.0.0/0");
     assert!(parsed.is_ok());
-    assert_eq!(parsed.unwrap(), Expr::Atomic(Atomic::V4(V4(0, 0))));
+    assert_eq!(parsed.unwrap(), Stmt::Expr(Expr::Atomic(Atomic::V4(V4(0, 0)))));
 
-    let parsed = parse("101.6.6.6/32");
+    let parsed = parse_single("101.6.6.6/32");
     assert!(parsed.is_ok());
-    assert_eq!(parsed.unwrap(), Expr::Atomic(Atomic::V4(V4(1694893574u32, 32))));
+    assert_eq!(parsed.unwrap(), Stmt::Expr(Expr::Atomic(Atomic::V4(V4(1694893574u32, 32)))));
 
-    let parsed = parse("::/0");
+    let parsed = parse_single("::/0");
     assert!(parsed.is_ok());
-    assert_eq!(parsed.unwrap(), Expr::Atomic(Atomic::V6(V6(0, 0))));
+    assert_eq!(parsed.unwrap(), Stmt::Expr(Expr::Atomic(Atomic::V6(V6(0, 0)))));
 
-    let parsed = parse("::1/128");
+    let parsed = parse_single("::1/128");
     assert!(parsed.is_ok());
-    assert_eq!(parsed.unwrap(), Expr::Atomic(Atomic::V6(V6(1, 128))));
+    assert_eq!(parsed.unwrap(), Stmt::Expr(Expr::Atomic(Atomic::V6(V6(1, 128)))));
 
-    let parsed = parse("2001:da8::666/24");
+    let parsed = parse_single("2001:da8::666/24");
     assert!(parsed.is_ok());
-    assert_eq!(parsed.unwrap(), Expr::Atomic(Atomic::V6(V6(42540765143631992628674583454950622822u128, 24))));
+    assert_eq!(parsed.unwrap(), Stmt::Expr(Expr::Atomic(Atomic::V6(V6(42540765143631992628674583454950622822u128, 24)))));
 
     let example = r#"
-    let meow = ::/0 in
-    let meow_meow = 2001:da8::666/128 in
+    let meow = ::/0
+    let meow_meow = 2001:da8::666/128
     meow + meow_meow - meow
     "#;
     let parsed = parse(example);

@@ -1,0 +1,3 @@
+let meow = ::/0
+let meow_meow = 2001:da8::666/128
+meow + meow_meow

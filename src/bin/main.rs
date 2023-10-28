@@ -1,12 +1,8 @@
 use std::path::PathBuf;
 
 use clap::Parser;
-use eval::{eval, format};
-use parser::parse;
-
-mod parser;
-mod eval;
-mod data;
+use cidr_calc::eval::{eval, format, Value};
+use cidr_calc::parser::parse;
 
 #[derive(Parser)]
 struct Args {
@@ -19,8 +15,15 @@ fn main() -> anyhow::Result<()> {
     let content = std::fs::read_to_string(&args.input)?;
     let parsed = parse(&content)?;
     let evaled = eval(&parsed)?;
-    for row in format(&evaled) {
-        println!("{}", row);
+    println!("{:?}", evaled);
+    for value in evaled {
+        match value {
+            Value::Unit => {},
+            _ => {
+                println!("[{}]", format(&value).collect::<Vec<_>>().join(","))
+            }
+        }
     }
+
     Ok(())
 }

@@ -19,7 +19,7 @@ impl ToString for V4 {
 impl ToString for V6 {
     fn to_string(&self) -> String {
         if self.1 == 0 {
-            return "0.0.0.0/0".to_owned();
+            return "::/0".to_owned();
         }
 
         let masked = self.0 & !((1u128 << (128 - self.1)) - 1);
@@ -56,7 +56,7 @@ impl ToString for V6 {
             let seg_head = &segs[0..seg_start];
             let seg_tail= &segs[(zero_lengths_max.1 + 1)..8];
             let head = seg_head.iter().map(|e| e.as_ref().map(|i| i.as_str()).unwrap_or("0")).collect::<Vec<_>>().join(":");
-            let tail = seg_tail.iter().map(|e| e.as_ref().map(|i| i.as_str()).unwrap_or("0")).collect::<Vec<_>>().join(":");;
+            let tail = seg_tail.iter().map(|e| e.as_ref().map(|i| i.as_str()).unwrap_or("0")).collect::<Vec<_>>().join(":");
             format!("{}::{}/{}", head, tail, self.1)
         }
     }

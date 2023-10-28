@@ -1,8 +1,8 @@
-use std::{rc::Rc, collections::VecDeque};
+use std::{rc::Rc, collections::VecDeque, iter};
 
 use anyhow::anyhow;
 
-use crate::{parser::{Expr, Atomic}, data::{V4, V6}};
+use crate::{parser::{Expr, Atomic, Stmt}, data::{V4, V6}};
 
 #[derive(Clone, Debug)]
 struct SetNode<const MAX_DEPTH: usize> {
@@ -234,6 +234,7 @@ impl<'a, const MAX_DEPTH: usize> Iterator for SetWalker<'a, MAX_DEPTH> {
 
 #[derive(Clone, Debug)]
 pub enum Value {
+    Unit,
     V4Set(SetNode<32>),
     V6Set(SetNode<128>),
 }
@@ -329,35 +330,57 @@ struct Scope<'s> {
     bindings: im::HashMap<&'s str, Value>,
 }
 
-pub fn eval<'a>(expr: &Expr<'a>) -> anyhow::Result<Value> {
-    eval_scope(expr, Scope {
+pub fn eval<'a>(stmts: &Vec<Stmt<'a>>) -> anyhow::Result<Vec<Value>> {
+    let mut scope = Scope {
         bindings: Default::default()
-    })
+    };
+
+    let mut output = Vec::with_capacity(stmts.len());
+
+    for stmt in stmts {
+        let (v, s) = eval_stmt(stmt, scope)?;
+        scope = s;
+        output.push(v);
+    }
+
+    Ok(output)
+}
+
+pub fn eval_single<'a>(stmt: &Stmt<'a>) -> anyhow::Result<Value> {
+    eval_stmt(stmt, Scope {
+        bindings: Default::default()
+    }).map(|e| e.0)
 }
 
 pub fn format<'a>(v: &'a Value) -> Box<dyn Iterator<Item = String> + 'a> {
     match v {
+        Value::Unit => Box::new(iter::empty()),
         Value::V4Set(s) => Box::new(SetWalker::new(s).map(V4::from).map(|e| e.to_string())),
         Value::V6Set(s) => Box::new(SetWalker::new(s).map(V6::from).map(|e| e.to_string())),
     }
 }
 
-fn eval_scope<'a>(expr: &Expr<'a>, s: Scope<'a>) -> anyhow::Result<Value> {
+fn eval_stmt<'a>(stmt : &Stmt<'a>, mut s: Scope<'a>) -> anyhow::Result<(Value, Scope<'a>)> {
+    match stmt {
+        Stmt::LetIn { ident, val } => {
+            let val_evaled = eval_expr(val.as_ref(), s.clone())?;
+            s.bindings.insert(*ident, val_evaled);
+            Ok((Value::Unit, s))
+        },
+        Stmt::Expr(e) => eval_expr(e, s.clone()).map(|r| (r, s))
+    }
+}
+
+fn eval_expr<'a>(expr: &Expr<'a>, s: Scope<'a>) -> anyhow::Result<Value> {
     match expr {
-        Expr::LetIn { ident, val, body } => {
-            let val_evaled = eval_scope(val.as_ref(), s.clone())?;
-            let mut new_scope = s.clone();
-            new_scope.bindings.insert(*ident, val_evaled);
-            eval_scope(&body, new_scope)
-        }
         Expr::Addition(lhs, rhs) => {
-            let lhs = eval_scope(lhs, s.clone())?;
-            let rhs = eval_scope(rhs, s)?;
+            let lhs = eval_expr(lhs, s.clone())?;
+            let rhs = eval_expr(rhs, s)?;
             lhs.union(&rhs)
         }
         Expr::Subtraction(lhs, rhs) => {
-            let lhs = eval_scope(lhs, s.clone())?;
-            let rhs = eval_scope(rhs, s)?;
+            let lhs = eval_expr(lhs, s.clone())?;
+            let rhs = eval_expr(rhs, s)?;
             lhs.subtract(&rhs)
         }
         Expr::Atomic(a) => match a {
@@ -373,12 +396,12 @@ fn eval_scope<'a>(expr: &Expr<'a>, s: Scope<'a>) -> anyhow::Result<Value> {
 
 #[test]
 fn test() {
-    use crate::parser::parse;
+    use crate::parser::parse_single;
     // FIXME: write real test!
-    println!("{:?}", eval(&parse("0.0.0.0/0").unwrap()));
-    println!("{:?}", eval(&parse("::1/128").unwrap()));
-    println!("{:?}", eval(&parse("::1/128 - ::/0").unwrap()));
-    println!("{:?}", eval(&parse("0.0.0.0/1").unwrap()));
-    println!("{:?}", eval(&parse("0.0.0.0/1 + 128.0.0.0/1").unwrap()));
-    println!("{:?}", eval(&parse("0.0.0.0/0 - 101.6.6.6/32").unwrap()));
+    println!("{:?}", eval_single(&parse_single("0.0.0.0/0").unwrap()));
+    println!("{:?}", eval_single(&parse_single("::1/128").unwrap()));
+    println!("{:?}", eval_single(&parse_single("::1/128 - ::/0").unwrap()));
+    println!("{:?}", eval_single(&parse_single("0.0.0.0/1").unwrap()));
+    println!("{:?}", eval_single(&parse_single("0.0.0.0/1 + 128.0.0.0/1").unwrap()));
+    println!("{:?}", eval_single(&parse_single("0.0.0.0/0 - 101.6.6.6/32").unwrap()));
 }

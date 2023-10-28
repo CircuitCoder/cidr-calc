@@ -133,7 +133,7 @@ fn map_expr<'a>(p: Pair<'a, Rule>) -> anyhow::Result<Expr<'a>> {
             }
             Ok(collected)
         }
-        Rule::atomic | Rule::expr => map_expr(p.into_inner().next().unwrap()),
+        Rule::atomic => map_expr(p.into_inner().next().unwrap()),
         Rule::paren_expr => map_expr(p.into_inner().skip(1).next().unwrap()),
         e => unreachable!("Excuse me pest? Why am I reading {:?}?", e)
     }

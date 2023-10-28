@@ -326,8 +326,20 @@ impl From<(u128, usize)> for V6 {
 }
 
 #[derive(Clone)]
-struct Scope<'s> {
-    bindings: im::HashMap<&'s str, Value>,
+pub struct Scope {
+    bindings: im::HashMap<String, Value>,
+}
+
+impl Default for Scope {
+    fn default() -> Self {
+        Self { bindings: Default::default() }
+    }
+}
+
+impl Scope {
+    pub fn keys<'s>(&'s self) -> impl Iterator<Item = &'s str> + 's {
+        self.bindings.keys().map(String::as_str)
+    }
 }
 
 pub fn eval<'a>(stmts: &Vec<Stmt<'a>>) -> anyhow::Result<Vec<Value>> {
@@ -346,12 +358,6 @@ pub fn eval<'a>(stmts: &Vec<Stmt<'a>>) -> anyhow::Result<Vec<Value>> {
     Ok(output)
 }
 
-pub fn eval_single<'a>(stmt: &Stmt<'a>) -> anyhow::Result<Value> {
-    eval_stmt(stmt, Scope {
-        bindings: Default::default()
-    }).map(|e| e.0)
-}
-
 pub fn format<'a>(v: &'a Value) -> Box<dyn Iterator<Item = String> + 'a> {
     match v {
         Value::Unit => Box::new(iter::empty()),
@@ -360,18 +366,18 @@ pub fn format<'a>(v: &'a Value) -> Box<dyn Iterator<Item = String> + 'a> {
     }
 }
 
-fn eval_stmt<'a>(stmt : &Stmt<'a>, mut s: Scope<'a>) -> anyhow::Result<(Value, Scope<'a>)> {
+pub fn eval_stmt<'a>(stmt : &Stmt<'a>, mut s: Scope) -> anyhow::Result<(Value, Scope)> {
     match stmt {
         Stmt::LetIn { ident, val } => {
             let val_evaled = eval_expr(val.as_ref(), s.clone())?;
-            s.bindings.insert(*ident, val_evaled);
+            s.bindings.insert(ident.to_string(), val_evaled);
             Ok((Value::Unit, s))
         },
         Stmt::Expr(e) => eval_expr(e, s.clone()).map(|r| (r, s))
     }
 }
 
-fn eval_expr<'a>(expr: &Expr<'a>, s: Scope<'a>) -> anyhow::Result<Value> {
+fn eval_expr<'a>(expr: &Expr<'a>, s: Scope) -> anyhow::Result<Value> {
     match expr {
         Expr::Addition(lhs, rhs) => {
             let lhs = eval_expr(lhs, s.clone())?;
@@ -385,7 +391,7 @@ fn eval_expr<'a>(expr: &Expr<'a>, s: Scope<'a>) -> anyhow::Result<Value> {
         }
         Expr::Atomic(a) => match a {
             Atomic::Ident(i) => {
-                let lookup = s.bindings.get(i);
+                let lookup = s.bindings.get(*i);
                 lookup.cloned().ok_or_else(|| anyhow!("Identifier not found in scope: {}", *i))
             }
             Atomic::V4(v) => Ok(Value::V4Set(v.into())),
@@ -396,6 +402,11 @@ fn eval_expr<'a>(expr: &Expr<'a>, s: Scope<'a>) -> anyhow::Result<Value> {
 
 #[test]
 fn test() {
+    fn eval_single<'a>(stmt: &Stmt<'a>) -> anyhow::Result<Value> {
+        eval_stmt(stmt, Scope {
+            bindings: Default::default()
+        }).map(|e| e.0)
+    }
     use crate::parser::parse_single;
     // FIXME: write real test!
     println!("{:?}", eval_single(&parse_single("0.0.0.0/0").unwrap()));

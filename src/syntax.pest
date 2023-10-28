@@ -18,7 +18,7 @@ ident_tail = @{
 ident = @{
     !(hex ~ ":")
     ~ !(kw ~ !ident_tail)
-    ~ ident_head ~ ident_tail+
+    ~ ident_head ~ ident_tail*
 }
 
 v4addr = @{ number ~ "." ~ number ~ "." ~ number ~ "." ~ number }

@@ -2,6 +2,11 @@
 name = "cidr-calc"
 version = "0.1.0"
 edition = "2021"
+description = "CIDR addition / subtraction calculator. Maybe useful for setting route tables when metrics are not available (e.g. wireguard next-hop)"
+license = "MIT"
+license-file = "LICENSE"
+repository = "https://github.com/CircuitCoder/cidr-calc"
+readme = "README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

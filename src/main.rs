@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 
 use clap::Parser;
-use cidr_calc::eval::{eval, format, Value, eval_stmt, Scope};
-use cidr_calc::parser::{parse, parse_single};
+use cidr_calculator::eval::{eval, format, Value, eval_stmt, Scope};
+use cidr_calculator::parser::{parse, parse_single};
 use rustyline::DefaultEditor;
 
 #[derive(Parser)]

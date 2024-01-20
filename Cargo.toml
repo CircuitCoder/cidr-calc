@@ -1,5 +1,5 @@
 [package]
-name = "cidr-calc"
+name = "cidr-calculator"
 version = "0.1.0"
 edition = "2021"
 description = "CIDR addition / subtraction calculator. Maybe useful for setting route tables when metrics are not available (e.g. wireguard next-hop)"

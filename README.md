@@ -1,5 +1,7 @@
 # CIDR Calculator
 
+[![Crates.io Version](https://img.shields.io/crates/v/cidr-calculator)](https://crates.io/crates/cidr-calculator)
+
 CIDR addition / subtraction calculator. Maybe useful for setting route tables when metrics are not available (e.g. wireguard next-hop)
 
 ```

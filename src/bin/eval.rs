@@ -1,5 +1,3 @@
-#![feature(try_blocks)]
-
 use std::path::PathBuf;
 
 use clap::Parser;
@@ -45,12 +43,12 @@ fn repl() -> anyhow::Result<()> {
                 if line == "/s" {
                     println!("In scope: {}", scope.keys().collect::<Vec<_>>().join(", "));
                 } else {
-                    let evaled: anyhow::Result<_> = try {
+                    let evaled: anyhow::Result<_> = (|| {
                         let stmt = parse_single(&line)?;
                         let (v, s) = eval_stmt(&stmt, scope.clone())?;
                         scope = s;
-                        v
-                    };
+                        Ok(v)
+                    })();
                     match evaled {
                         Ok(Value::Unit) => {
                             continue;

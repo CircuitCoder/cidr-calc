@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+
+<title>CIDR Calculator</title>
+
+<style>
+  body {
+    margin: 0;
+    background: #333;
+    color: white;
+    font-family: monospace;
+  }
+
+  .loading-overlay {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+
+    background: #333;
+
+    font-size: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255,255,255,.3);
+    transition: opacity .2s ease-in;
+  }
+
+  body:not(.loading) .loading-overlay {
+    pointer-events: none;
+    opacity: 0;
+  }
+
+  main {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 40px 60px;
+    min-height: 100vh;
+    box-sizing: border-box;
+  }
+
+  .line {
+    white-space: pre-wrap;
+    word-break: break-all;
+    font-size: 24px;
+    line-height: 28px;
+    font-size: 18px;
+    position: relative;
+  }
+
+  .active {
+    outline: none;
+    cursor: text;
+  }
+
+  .input {
+    margin: 30px 0 10px 0;
+    color: rgba(255,255,255,.7);
+    min-height: 28px;
+  }
+
+  .input::after {
+    content: '';
+    background: rgba(0,0,0,.1);
+    position: absolute;
+    top: -5px;
+    bottom: -5px;
+    left: -10px;
+    right: -10px;
+    border-radius: 2px;
+    pointer-events: none;
+  }
+
+  .error {
+    color: rgb(255, 101, 101);
+  }
+
+  .input::before {
+    content: "[" attr(data-cnt) "] >  ";
+    position: absolute;
+    top: 0;
+    right: 100%;
+    transform: translateX(-10px);
+    white-space: pre;
+    font-size: 12px;
+    color: rgba(255,255,255,.38);
+    pointer-events: none;
+  }
+
+  /* Dirty hack because Chrome is bad at styling */
+  .active:empty {
+    height: 28px;
+  }
+
+  .active:empty::after {
+    content: 'Leave empty to print scope';
+    padding: 5px 10px;
+    color: rgba(255,255,255,.3);
+    font-size: 12px;
+  }
+</style>
+
+<script>
+  window.onloadPromise = new Promise(resolve => window.addEventListener('load', resolve));
+</script>
+
+<script type="module">
+  import init, * as Backend from "./pkg/cidr_calculator_web.js"
+  Promise.all([window.onloadPromise, init()]).then(() => {
+    console.log("WASM initialization completed");
+    document.body.classList.remove('loading');
+
+    let pending = '';
+    const input = document.getElementsByClassName('active')[0];
+    const main = document.getElementsByTagName("main")[0];
+
+    input.focus();
+    let cnt = 0;
+
+    let state = Backend.create_state();
+
+    input.addEventListener("keydown", (e) => {
+      console.log(e.key);
+      if(e.key === 'Enter') {
+        const inputCont = input.innerText;
+
+        let result;
+        let errored = false;
+        if(inputCont.trim() === '') {
+          const scope = Backend.print_scope(state);
+          if(scope.length > 0) result = 'In scope: ' + scope.join(', ');
+          else result = 'Empty scope';
+        } else {
+          try {
+            result = Backend.eval_input(state, inputCont.trim()).join('\n');
+          } catch(e) {
+            errored = true;
+            result = e;
+          }
+        }
+        
+        const hist = document.createElement('div');
+        hist.classList.add('line');
+        hist.classList.add('input');
+        hist.setAttribute('data-cnt', cnt.toString());
+        hist.innerText = inputCont;
+
+        main.insertBefore(hist, input);
+
+        const output = document.createElement('div');
+        output.classList.add('line');
+        output.classList.add('output');
+        if(errored) output.classList.add('error');
+        output.innerText = result;
+        main.insertBefore(output, input);
+
+        cnt++;
+        input.setAttribute('data-cnt', cnt.toString());
+        input.innerText = '';
+
+        e.preventDefault();
+      }
+      window.scrollTo(0, document.body.getBoundingClientRect().height);
+    })
+
+    document.body.addEventListener('mousedown', e => {
+      if(e.target === document.body || e.target === main) {
+        if(document.activeElement !== input) {
+          input.focus();
+          const range = document.createRange();
+          range.selectNodeContents(input);
+          range.collapse(false);
+          const selection = window.getSelection();
+          selection.removeAllRanges();
+          selection.addRange(range);
+        }
+        e.preventDefault();
+      }
+    })
+  });
+</script>
+
+<body class="loading">
+  <div class="loading-overlay">
+    Loading...
+  </div>
+
+  <main><div data-cnt="0" class="line input active" contenteditable="true"></div></main>
+</body>

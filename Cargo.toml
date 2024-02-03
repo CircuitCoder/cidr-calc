@@ -5,8 +5,3 @@ members = [
   'cidr-calc-web',
 ]
 resolver = "2"
-
-
-[profile.release.package."cidr-calculator-web"]
-# Tell `rustc` to optimize for small code size.
-opt-level = "s"

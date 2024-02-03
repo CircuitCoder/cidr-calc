@@ -1,0 +1,17 @@
+{
+  "name": "cidr-calculator-web",
+  "collaborators": [
+    "Liu Xiaoyi <circuitcoder0@gmail.com>"
+  ],
+  "version": "0.1.0",
+  "files": [
+    "cidr_calculator_web_bg.wasm",
+    "cidr_calculator_web.js",
+    "cidr_calculator_web.d.ts"
+  ],
+  "module": "cidr_calculator_web.js",
+  "types": "cidr_calculator_web.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}

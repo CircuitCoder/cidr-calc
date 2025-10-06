@@ -12,7 +12,7 @@ readme = "../README.md"
 [dependencies]
 anyhow = "1.0.100"
 im = "15.1.0"
-pest = "2.8.2"
+pest = "2.8.3"
 pest_derive = "2.8.2"
 rustyline = { version = "17.0.1", optional = true }
 clap = { version = "4.5.48", features = ["derive"], optional = true }

@@ -15,7 +15,7 @@ im = "15.1.0"
 pest = "2.8.5"
 pest_derive = "2.8.2"
 rustyline = { version = "17.0.2", optional = true }
-clap = { version = "4.5.54", features = ["derive"], optional = true }
+clap = { version = "4.5.60", features = ["derive"], optional = true }
 
 [features]
 default = ["cli"]
